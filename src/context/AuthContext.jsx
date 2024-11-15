@@ -22,12 +22,17 @@ export const AuthProvider = ({ children }) => {
       setLoading(true);
       setError(null);
       const response = await axios.post('http://localhost:3001/api/auth/login', credentials);
-      const { token, user } = response.data;
-      localStorage.setItem('token', token);
-      setUser(user);
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      return true;
+      console.log('Respuesta del servidor:', response.data);
+      
+      if (response.data.token && response.data.user) {
+        localStorage.setItem('token', response.data.token);
+        setUser(response.data.user);
+        return true;
+      } else {
+        throw new Error('Respuesta inválida del servidor');
+      }
     } catch (err) {
+      console.error('Error de login:', err);
       setError(err.response?.data?.message || 'Error al iniciar sesión');
       return false;
     } finally {
@@ -37,7 +42,6 @@ export const AuthProvider = ({ children }) => {
 
   const logout = () => {
     localStorage.removeItem('token');
-    delete axios.defaults.headers.common['Authorization'];
     setUser(null);
   };
 
