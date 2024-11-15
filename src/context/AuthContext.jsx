@@ -25,6 +25,7 @@ export const AuthProvider = ({ children }) => {
       const { token, user } = response.data;
       localStorage.setItem('token', token);
       setUser(user);
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       return true;
     } catch (err) {
       setError(err.response?.data?.message || 'Error al iniciar sesión');
@@ -36,6 +37,7 @@ export const AuthProvider = ({ children }) => {
 
   const logout = () => {
     localStorage.removeItem('token');
+    delete axios.defaults.headers.common['Authorization'];
     setUser(null);
   };
 
