@@ -1,13 +1,15 @@
-// src/pages/Empaste.jsx
+// src/pages/Oficina.jsx
 import React, { useState, useEffect } from 'react';
-import { pedidosService } from '../services/api';
+import axios from 'axios';
 
-const Empaste = () => {
+const Oficina = () => {
   const [pedidos, setPedidos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [filtro, setFiltro] = useState('');
+  const [pedidosFiltrados, setPedidosFiltrados] = useState([]);
   const [pedidoSeleccionado, setPedidoSeleccionado] = useState(null);
-  const [piezasCompletadas, setPiezasCompletadas] = useState({});
+  const [mostrarDetalle, setMostrarDetalle] = useState(false);
 
   useEffect(() => {
     cargarPedidos();
@@ -15,10 +17,17 @@ const Empaste = () => {
 
   const cargarPedidos = async () => {
     try {
-      setLoading(true);
-      const { data } = await pedidosService.getPedidos();
-      setPedidos(data.filter(p => p.estado === 'empaste'));
-      setError(null);
+      const { data } = await axios.get('http://localhost:3001/api/pedidos', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      // Ordenar por fecha de creación (más recientes primero)
+      const pedidosOrdenados = data.sort((a, b) => 
+        new Date(b.created_at) - new Date(a.created_at)
+      );
+      setPedidos(pedidosOrdenados);
+      setPedidosFiltrados(pedidosOrdenados);
     } catch (err) {
       setError('Error al cargar pedidos');
       console.error(err);
@@ -27,159 +36,289 @@ const Empaste = () => {
     }
   };
 
-  const actualizarPieza = (pedidoId, piezaId, completada) => {
-    setPiezasCompletadas(prev => ({
-      ...prev,
-      [`${pedidoId}-${piezaId}`]: completada
-    }));
-  };
+  // Función de filtrado
+  useEffect(() => {
+    const resultado = pedidos.filter(pedido => 
+      pedido.numero.toString().includes(filtro) ||
+      pedido.modelo.toLowerCase().includes(filtro.toLowerCase()) ||
+      pedido.color.toLowerCase().includes(filtro.toLowerCase())
+    );
+    setPedidosFiltrados(resultado);
+  }, [filtro, pedidos]);
 
-  const finalizarEmpaste = async (pedidoId) => {
+  const aceptarPedido = async (pedidoId) => {
     try {
-      setLoading(true);
-      await pedidosService.actualizarEstado(pedidoId, 'troquelado');
-      setPedidoSeleccionado(null);
+      await axios.put(
+        `http://localhost:3001/api/pedidos/${pedidoId}/estado`,
+        { 
+          estado: 'aceptado',
+          fecha_aceptacion: new Date()
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        }
+      );
       await cargarPedidos();
-      setPiezasCompletadas({});
-      setError(null);
+      setMostrarDetalle(false);
     } catch (err) {
-      setError('Error al finalizar empaste');
-      console.error(err);
-    } finally {
-      setLoading(false);
+      console.error('Error:', err);
+      alert('Error al procesar el pedido');
     }
   };
 
-  const DetallePedido = ({ pedido }) => {
-    const todasPiezasCompletadas = pedido.piezas.every(
-      pieza => piezasCompletadas[`${pedido._id}-${pieza._id}`]
-    );
-
-    return (
-      <div className="bg-white p-6 rounded-lg shadow">
-        <div className="flex justify-between items-center mb-6">
-          <h3 className="text-lg font-medium">Pedido #{pedido.numero}</h3>
-          <button
-            onClick={() => setPedidoSeleccionado(null)}
-            className="text-gray-500 hover:text-gray-700"
-          >
-            Cerrar
-          </button>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4 mb-6">
-          <div>
-            <p className="text-sm text-gray-500">Modelo</p>
-            <p className="font-medium">{pedido.modelo}</p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-500">Color</p>
-            <p className="font-medium">{pedido.color}</p>
-          </div>
-        </div>
-
-        <div className="space-y-4">
-          <h4 className="font-medium">Piezas a Empastar</h4>
-          {pedido.piezas.map((pieza) => (
-            <div key={pieza._id} className="flex items-center justify-between p-3 bg-gray-50 rounded">
-              <div>
-                <span className="font-medium">{pieza.nombre}</span>
-                <span className="text-sm text-gray-500 ml-2">({pieza.cantidad} unidades)</span>
-              </div>
-              <label className="inline-flex items-center">
-                <input
-                  type="checkbox"
-                  className="form-checkbox h-5 w-5 text-blue-600"
-                  checked={piezasCompletadas[`${pedido._id}-${pieza._id}`] || false}
-                  onChange={(e) => actualizarPieza(pedido._id, pieza._id, e.target.checked)}
-                  disabled={loading}
-                />
-                <span className="ml-2">Completado</span>
-              </label>
-            </div>
-          ))}
-        </div>
-
-        <div className="mt-6">
-          <button
-            onClick={() => finalizarEmpaste(pedido._id)}
-            disabled={!todasPiezasCompletadas || loading}
-            className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? 'Procesando...' : 'Finalizar Empaste'}
-          </button>
-        </div>
-      </div>
-    );
+  const recibirPedido = async (pedidoId) => {
+    try {
+      await axios.put(
+        `http://localhost:3001/api/pedidos/${pedidoId}/estado`,
+        { 
+          estado: 'recibido',
+          fecha_recepcion: new Date()
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        }
+      );
+      await cargarPedidos();
+      setMostrarDetalle(false);
+    } catch (err) {
+      console.error('Error:', err);
+      alert('Error al procesar el pedido');
+    }
   };
 
-  if (loading && !pedidos.length) {
-    return <div className="flex justify-center items-center h-64">Cargando...</div>;
-  }
+  const getEstadoColor = (estado) => {
+    switch (estado) {
+      case 'pendiente':
+        return 'bg-red-100 text-red-800';
+      case 'aceptado':
+        return 'bg-orange-100 text-orange-800';
+      case 'recibido':
+        return 'bg-green-100 text-green-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  if (loading) return <div className="text-center p-4">Cargando...</div>;
+  if (error) return <div className="text-red-500 text-center p-4">{error}</div>;
+
+  const getEstadoTexto = (estado) => {
+    switch (estado) {
+      case 'pendiente':
+        return 'Pendiente de Aceptar';
+      case 'aceptado':
+        return 'Aceptado';
+      case 'recibido':
+        return 'Recibido en Oficina';
+      default:
+        return estado;
+    }
+  };
 
   return (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-gray-800">Módulo Empaste</h2>
-      
-      {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
-          <span className="block sm:inline">{error}</span>
+    <div className="max-w-7xl mx-auto p-4 space-y-6">
+      {/* Buscador */}
+      <div className="bg-white shadow rounded-lg p-4">
+        <div className="flex justify-between items-center">
+          <h2 className="text-2xl font-bold">Pedidos</h2>
+          <div className="flex gap-4 items-center">
+            <input
+              type="text"
+              placeholder="Buscar por número, modelo o color..."
+              className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 w-80"
+              value={filtro}
+              onChange={(e) => setFiltro(e.target.value)}
+            />
+          </div>
         </div>
-      )}
+      </div>
 
-      {pedidoSeleccionado ? (
-        <DetallePedido pedido={pedidoSeleccionado} />
-      ) : (
-        <div className="bg-white shadow rounded-lg p-6">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Pedidos para Empastar</h3>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Número
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Modelo
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Color
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Piezas
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Acciones
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {pedidos.map((pedido) => (
-                  <tr key={pedido._id}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+      {/* Lista de Pedidos */}
+      <div className="bg-white shadow rounded-lg p-6">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Número
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Modelo
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Color
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Solicitante
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Fecha Pedido
+                </th>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Estado
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {pedidosFiltrados.length > 0 ? (
+                pedidosFiltrados.map((pedido) => (
+                  <tr 
+                    key={pedido.id}
+                    onClick={() => {
+                      setPedidoSeleccionado(pedido);
+                      setMostrarDetalle(true);
+                    }}
+                    className={`cursor-pointer hover:bg-gray-50 border-l-4 ${
+                      pedido.estado === 'pendiente' ? 'border-red-500' : 
+                      pedido.estado === 'aceptado' ? 'border-orange-500' : 
+                      'border-green-500'
+                    }`}
+                  >
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                       {pedido.numero}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {pedido.modelo}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {pedido.color}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {pedido.piezas.length} piezas
+                      {pedido.usuario_nombre}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <button
-                        onClick={() => setPedidoSeleccionado(pedido)}
-                        className="text-blue-600 hover:text-blue-900"
-                      >
-                        Procesar
-                      </button>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {new Date(pedido.created_at).toLocaleString()}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                      <span className={`px-4 py-2 rounded-full ${
+                        pedido.estado === 'pendiente' ? 'bg-red-100 text-red-800' : 
+                        pedido.estado === 'aceptado' ? 'bg-orange-100 text-orange-800' : 
+                        'bg-green-100 text-green-800'
+                      }`}>
+                        {getEstadoTexto(pedido.estado)}
+                      </span>
                     </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="6" className="px-6 py-4 text-center text-gray-500">
+                    {filtro ? "No se encontraron pedidos que coincidan con la búsqueda" : "No hay pedidos disponibles"}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Modal de Detalle */}
+      {mostrarDetalle && pedidoSeleccionado && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-full max-w-3xl shadow-lg rounded-md bg-white">
+            <div className="mt-3">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-xl font-medium text-gray-900">
+                  Detalle del Pedido #{pedidoSeleccionado.numero}
+                </h3>
+                <button
+                  onClick={() => setMostrarDetalle(false)}
+                  className="text-gray-400 hover:text-gray-500"
+                >
+                  <span className="text-2xl">&times;</span>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-4 gap-4 mb-6">
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Modelo</p>
+                  <p className="mt-1">{pedidoSeleccionado.modelo}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Color</p>
+                  <p className="mt-1">{pedidoSeleccionado.color}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Solicitante</p>
+                  <p className="mt-1">{pedidoSeleccionado.usuario_nombre}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Estado</p>
+                  <span className={`mt-1 px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                    pedidoSeleccionado.estado === 'pendiente' ? 'bg-red-100 text-red-800' : 
+                    pedidoSeleccionado.estado === 'aceptado' ? 'bg-orange-100 text-orange-800' : 
+                    'bg-green-100 text-green-800'
+                  }`}>
+                    {getEstadoTexto(pedidoSeleccionado.estado)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="mb-6">
+                <h4 className="text-lg font-medium mb-2">Historial</h4>
+                <div className="space-y-2 text-sm">
+                  <p>Creado: {new Date(pedidoSeleccionado.created_at).toLocaleString()}</p>
+                  {pedidoSeleccionado.fecha_aceptacion && (
+                    <p>Aceptado: {new Date(pedidoSeleccionado.fecha_aceptacion).toLocaleString()}</p>
+                  )}
+                  {pedidoSeleccionado.fecha_recepcion && (
+                    <p>Recibido: {new Date(pedidoSeleccionado.fecha_recepcion).toLocaleString()}</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="mb-6">
+                <h4 className="text-lg font-medium mb-2">Desglose de Piezas</h4>
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Pieza</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Cantidad</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {pedidoSeleccionado.piezas.map((pieza, index) => (
+                      <tr key={index}>
+                        <td className="px-6 py-4 text-sm text-gray-900">{pieza.nombre}</td>
+                        <td className="px-6 py-4 text-sm text-gray-900 text-right">{pieza.cantidad}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Botones de acción */}
+              <div className="flex justify-end space-x-4 mt-6">
+                <button
+                  onClick={() => setMostrarDetalle(false)}
+                  className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                >
+                  Cerrar
+                </button>
+                
+                {pedidoSeleccionado.estado === 'pendiente' && (
+                  <button
+                    onClick={() => aceptarPedido(pedidoSeleccionado.id)}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                  >
+                    Aceptar Pedido
+                  </button>
+                )}
+                
+                {pedidoSeleccionado.estado === 'aceptado' && (
+                  <button
+                    onClick={() => recibirPedido(pedidoSeleccionado.id)}
+                    className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+                  >
+                    Marcar como Recibido
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -187,4 +326,4 @@ const Empaste = () => {
   );
 };
 
-export default Empaste;
+export default Oficina;

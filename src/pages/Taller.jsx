@@ -14,6 +14,8 @@ const Taller = () => {
     color: '',
     componentes: []
   });
+  const [pedidoSeleccionado, setPedidoSeleccionado] = useState(null);
+  const [mostrarDetalle, setMostrarDetalle] = useState(false);
   const [pedidos, setPedidos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -143,6 +145,12 @@ const Taller = () => {
     }
   };
 
+  const verDetallePedido = (pedido) => {
+    setPedidoSeleccionado(pedido);
+    setMostrarDetalle(true);
+  };
+  
+
   const handleMarcarRecibido = async (pedidoId) => {
     try {
       await axios.put(`http://localhost:3001/api/pedidos/${pedidoId}/estado`, 
@@ -193,55 +201,54 @@ const Taller = () => {
         <h2 className="text-2xl font-bold mb-6">Nuevo Pedido</h2>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Número de Pedido
-        </label>
-        <input
-          type="text"
-          required
-          className="w-full border border-gray-300 rounded-md p-2"
-          placeholder="Número de pedido"
-          value={pedidoActual.numero}
-          onChange={(e) => setPedidoActual({...pedidoActual, numero: e.target.value})}
-        />
-      </div>
-      
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Modelo
-        </label>
-        <select
-          className="w-full border border-gray-300 rounded-md p-2"
-          value={pedidoActual.modelo}
-          onChange={handleModeloChange}
-        >
-          <option value="">Seleccionar modelo...</option>
-          {Object.keys(modelos).map(modelo => (
-            <option key={modelo} value={modelo}>{modelo}</option>
-          ))}
-        </select>
-      </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Número de Pedido
+            </label>
+            <input
+              type="text"
+              required
+              className="w-full border border-gray-300 rounded-md p-2"
+              placeholder="Número de pedido"
+              value={pedidoActual.numero}
+              onChange={(e) => setPedidoActual({...pedidoActual, numero: e.target.value})}
+            />
+          </div>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Color
-        </label>
-        <select
-          className="w-full border border-gray-300 rounded-md p-2"
-          value={pedidoActual.color}
-          onChange={(e) => setPedidoActual({...pedidoActual, color: e.target.value})}
-        >
-          <option value="">Seleccionar color...</option>
-          {colores.map(color => (
-            <option key={color} value={color}>{color}</option>
-          ))}
-        </select>
-      </div>
-    </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Modelo
+            </label>
+            <select
+              className="w-full border border-gray-300 rounded-md p-2"
+              value={pedidoActual.modelo}
+              onChange={handleModeloChange}
+            >
+              <option value="">Seleccionar modelo...</option>
+              {Object.keys(modelos).map(modelo => (
+                <option key={modelo} value={modelo}>{modelo}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Color
+            </label>
+            <select
+              className="w-full border border-gray-300 rounded-md p-2"
+              value={pedidoActual.color}
+              onChange={(e) => setPedidoActual({...pedidoActual, color: e.target.value})}
+            >
+              <option value="">Seleccionar color...</option>
+              {colores.map(color => (
+                <option key={color} value={color}>{color}</option>
+              ))}
+            </select>
+          </div>
+        </div>
 
         {pedidoActual.modelo && (
-          
           <div>
             <h3 className="text-lg font-medium mb-4">Componentes</h3>
             <div className="overflow-x-auto">
@@ -331,52 +338,127 @@ const Taller = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-            {pedidosFiltrados.length > 0 ? (
-              pedidosFiltrados.map((pedido) => (
-                <tr key={pedido.id}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {pedido.numero}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {pedido.modelo}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {pedido.color}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full
-                      ${pedido.estado === 'pendiente' ? 'bg-yellow-100 text-yellow-800' : 
-                        pedido.estado === 'completado' ? 'bg-green-100 text-green-800' : 
-                        'bg-blue-100 text-blue-800'}`}>
-                      {pedido.estado}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {new Date(pedido.created_at).toLocaleDateString()}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-center">
-                    {pedido.estado === 'troquelado' && (
+              {pedidosFiltrados.length > 0 ? (
+                pedidosFiltrados.map((pedido) => (
+                  <tr key={pedido.id}>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {pedido.numero}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {pedido.modelo}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {pedido.color}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                        ${pedido.estado === 'pendiente' ? 'bg-yellow-100 text-yellow-800' : 
+                          pedido.estado === 'completado' ? 'bg-green-100 text-green-800' : 
+                          'bg-blue-100 text-blue-800'}`}>
+                        {pedido.estado}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {new Date(pedido.created_at).toLocaleDateString()}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <button
-                        onClick={() => handleMarcarRecibido(pedido.id)}
-                        className="text-blue-600 hover:text-blue-900"
+                        onClick={() => verDetallePedido(pedido)}
+                        className="text-blue-600 hover:text-blue-900 mr-4"
                       >
-                        Marcar Recibido
+                        Ver Detalle
                       </button>
-                    )}
+                      {pedido.estado === 'troquelado' && (
+                        <button
+                          onClick={() => handleMarcarRecibido(pedido.id)}
+                          className="text-green-600 hover:text-green-900"
+                        >
+                          Marcar Recibido
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="6" className="px-6 py-4 text-center text-gray-500">
+                    {filtro ? "No se encontraron pedidos que coincidan con la búsqueda" : "No hay pedidos activos"}
                   </td>
                 </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan="6" className="px-6 py-4 text-center text-gray-500">
-                  {filtro ? "No se encontraron pedidos que coincidan con la búsqueda" : "No hay pedidos activos"}
-                </td>
-              </tr>
-            )}
+              )}
             </tbody>
           </table>
         </div>
       </div>
+
+      {/* Modal de Detalle de Pedido */}
+      {mostrarDetalle && pedidoSeleccionado && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-full max-w-3xl shadow-lg rounded-md bg-white">
+            <div className="mt-3">
+              <div className="flex justify-between items-center">
+                <h3 className="text-lg font-medium text-gray-900">
+                  Detalle del Pedido #{pedidoSeleccionado.numero}
+                </h3>
+                <button
+                  onClick={() => setMostrarDetalle(false)}
+                  className="text-gray-400 hover:text-gray-500"
+                >
+                  <span className="text-2xl">&times;</span>
+                </button>
+              </div>
+              
+              <div className="mt-4 grid grid-cols-3 gap-4">
+                <div className="text-sm">
+                  <p className="font-medium text-gray-500">Modelo</p>
+                  <p>{pedidoSeleccionado.modelo}</p>
+                </div>
+                <div className="text-sm">
+                  <p className="font-medium text-gray-500">Color</p>
+                  <p>{pedidoSeleccionado.color}</p>
+                </div>
+                <div className="text-sm">
+                  <p className="font-medium text-gray-500">Estado</p>
+                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                    ${pedidoSeleccionado.estado === 'pendiente' ? 'bg-yellow-100 text-yellow-800' : 
+                      pedidoSeleccionado.estado === 'completado' ? 'bg-green-100 text-green-800' : 
+                      'bg-blue-100 text-blue-800'}`}>
+                    {pedidoSeleccionado.estado}
+                  </span>
+                </div>
+              </div>
+
+              <div className="mt-6">
+                <h4 className="font-medium text-gray-900 mb-4">Componentes</h4>
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Pieza
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Cantidad
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {pedidoSeleccionado.piezas.map((pieza, index) => (
+                      <tr key={index}>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {pieza.nombre}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">
+                          {pieza.cantidad}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
