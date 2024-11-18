@@ -83,39 +83,45 @@ const Taller = () => {
   };
 
   const guardarPedido = async () => {
-    if (!pedidoActual.numero) {
-      alert('Por favor ingrese el número de pedido');
-      return;
-    }
-  
-    if (!pedidoActual.modelo || !pedidoActual.color) {
-      alert('Por favor seleccione modelo y color');
-      return;
-    }
-  
     try {
-      // Comprobar que al menos una pieza tenga cantidad
-      if (!pedidoActual.componentes.some(c => c.cantidad > 0)) {
-        alert('Debe ingresar al menos una cantidad');
+      if (!pedidoActual.numero) {
+        alert('Por favor ingrese el número de pedido');
         return;
       }
   
-      const response = await axios.post('http://localhost:3001/api/pedidos', 
-        {
-          numero: pedidoActual.numero,
-          modelo: pedidoActual.modelo,
-          color: pedidoActual.color,
-          componentes: pedidoActual.componentes.filter(c => c.cantidad > 0)
-        },
+      if (!pedidoActual.modelo || !pedidoActual.color) {
+        alert('Por favor seleccione modelo y color');
+        return;
+      }
+  
+      // Log para debugging
+      console.log('Enviando pedido:', pedidoActual);
+  
+      const pedidoParaEnviar = {
+        numero: parseInt(pedidoActual.numero),
+        modelo: pedidoActual.modelo,
+        color: pedidoActual.color,
+        componentes: pedidoActual.componentes
+          .filter(c => c.cantidad > 0)
+          .map(c => ({
+            nombre: c.nombre,
+            cantidad: parseInt(c.cantidad)
+          }))
+      };
+  
+      const response = await axios.post(
+        'http://localhost:3001/api/pedidos', 
+        pedidoParaEnviar,
         {
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'application/json'
           }
         }
       );
   
       if (response.status === 201) {
-        // Limpiar el formulario
+        alert('Pedido guardado exitosamente');
         setPedidoActual({
           numero: '',
           modelo: '',
@@ -123,18 +129,17 @@ const Taller = () => {
           componentes: []
         });
         
-        // Recargar la lista de pedidos
-        const newPedidos = await axios.get('http://localhost:3001/api/pedidos', {
+        // Recargar pedidos
+        const { data: nuevosPedidos } = await axios.get('http://localhost:3001/api/pedidos', {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`
           }
         });
-        setPedidos(newPedidos.data);
-        alert('Pedido guardado exitosamente');
+        setPedidos(nuevosPedidos);
       }
     } catch (error) {
-      console.error('Error al guardar:', error.response?.data || error);
-      alert(`Error al guardar el pedido: ${error.response?.data?.message || 'Error interno del servidor'}`);
+      console.error('Error detallado:', error.response?.data);
+      alert(error.response?.data?.message || 'Error al guardar el pedido');
     }
   };
 

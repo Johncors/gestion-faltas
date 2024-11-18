@@ -25,39 +25,63 @@ const getPedidos = async (req, res) => {
 };
 
 const crearPedido = async (req, res) => {
-  const conn = await db.getConnection();
+  const connection = await db.getConnection();
   try {
-    await conn.beginTransaction();
+    await connection.beginTransaction();
     
-    const { modelo, color, piezas } = req.body;
-    const usuario_id = req.user.id;
+    const { numero, modelo, color, componentes } = req.body;
+    
+    // Log para debugging
+    console.log('Recibiendo pedido:', { numero, modelo, color, componentes });
 
-    const [numeroResult] = await conn.query('SELECT MAX(numero) as ultimo FROM pedidos');
-    const numero = (numeroResult[0].ultimo || 0) + 1;
-
-    const [pedidoResult] = await conn.query(
-      'INSERT INTO pedidos (numero, modelo, color, usuario_id) VALUES (?, ?, ?, ?)',
-      [numero, modelo, color, usuario_id]
-    );
-
-    for (const pieza of piezas) {
-      await conn.query(
-        'INSERT INTO piezas (pedido_id, nombre, cantidad) VALUES (?, ?, ?)',
-        [pedidoResult.insertId, pieza.nombre, pieza.cantidad]
-      );
+    // Verificar datos requeridos
+    if (!numero || !modelo || !color || !componentes) {
+      throw new Error('Faltan datos requeridos');
     }
 
-    await conn.commit();
+    // Verificar si el número ya existe
+    const [existente] = await connection.query(
+      'SELECT id FROM pedidos WHERE numero = ?',
+      [numero]
+    );
+
+    if (existente.length > 0) {
+      throw new Error('El número de pedido ya existe');
+    }
+
+    // Insertar pedido
+    const [result] = await connection.query(
+      `INSERT INTO pedidos (numero, modelo, color, estado) 
+       VALUES (?, ?, ?, 'pendiente')`,
+      [numero, modelo, color]
+    );
+
+    const pedidoId = result.insertId;
+
+    // Insertar componentes
+    for (const componente of componentes) {
+      if (componente.cantidad > 0) {
+        await connection.query(
+          'INSERT INTO piezas (pedido_id, nombre, cantidad) VALUES (?, ?, ?)',
+          [pedidoId, componente.nombre, componente.cantidad]
+        );
+      }
+    }
+
+    await connection.commit();
     res.status(201).json({ 
-      id: pedidoResult.insertId,
-      numero,
-      mensaje: 'Pedido creado exitosamente' 
+      message: 'Pedido creado exitosamente',
+      pedidoId 
     });
+
   } catch (error) {
-    await conn.rollback();
-    res.status(500).json({ message: 'Error al crear pedido' });
+    await connection.rollback();
+    console.error('Error en crearPedido:', error);
+    res.status(500).json({ 
+      message: error.message || 'Error al crear el pedido' 
+    });
   } finally {
-    conn.release();
+    connection.release();
   }
 };
 
