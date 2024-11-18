@@ -1,5 +1,5 @@
 // src/pages/Oficina.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 
 const Oficina = () => {
@@ -10,33 +10,39 @@ const Oficina = () => {
   const [pedidosFiltrados, setPedidosFiltrados] = useState([]);
   const [pedidoSeleccionado, setPedidoSeleccionado] = useState(null);
   const [mostrarDetalle, setMostrarDetalle] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  useEffect(() => {
-    cargarPedidos();
-  }, []);
-
-  const cargarPedidos = async () => {
+  const recargarPedidos = useCallback(async () => {
+    setIsLoading(true);
     try {
       const { data } = await axios.get('http://localhost:3001/api/pedidos', {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
       });
-      // Ordenar por fecha de creación (más recientes primero)
       const pedidosOrdenados = data.sort((a, b) => 
         new Date(b.created_at) - new Date(a.created_at)
       );
       setPedidos(pedidosOrdenados);
       setPedidosFiltrados(pedidosOrdenados);
+      setError(null);
     } catch (err) {
       setError('Error al cargar pedidos');
       console.error(err);
     } finally {
+      setIsLoading(false);
       setLoading(false);
     }
-  };
+  }, []);
 
-  // Función de filtrado
+  // Auto-recarga y carga inicial
+  useEffect(() => {
+    recargarPedidos();
+    const intervalo = setInterval(recargarPedidos, 30000);
+    return () => clearInterval(intervalo);
+  }, [recargarPedidos]);
+
+  // Filtrado de pedidos
   useEffect(() => {
     const resultado = pedidos.filter(pedido => 
       pedido.numero.toString().includes(filtro) ||
@@ -60,7 +66,7 @@ const Oficina = () => {
           }
         }
       );
-      await cargarPedidos();
+      await recargarPedidos();
       setMostrarDetalle(false);
     } catch (err) {
       console.error('Error:', err);
@@ -82,7 +88,7 @@ const Oficina = () => {
           }
         }
       );
-      await cargarPedidos();
+      await recargarPedidos();
       setMostrarDetalle(false);
     } catch (err) {
       console.error('Error:', err);
@@ -103,9 +109,6 @@ const Oficina = () => {
     }
   };
 
-  if (loading) return <div className="text-center p-4">Cargando...</div>;
-  if (error) return <div className="text-red-500 text-center p-4">{error}</div>;
-
   const getEstadoTexto = (estado) => {
     switch (estado) {
       case 'pendiente':
@@ -119,23 +122,39 @@ const Oficina = () => {
     }
   };
 
+  if (loading) return <div className="text-center p-4">Cargando...</div>;
+  if (error) return <div className="text-red-500 text-center p-4">{error}</div>;
+
   return (
     <div className="max-w-7xl mx-auto p-4 space-y-6">
       {/* Buscador */}
       <div className="bg-white shadow rounded-lg p-4">
         <div className="flex justify-between items-center">
           <h2 className="text-2xl font-bold">Pedidos</h2>
-          <div className="flex gap-4 items-center">
-            <input
-              type="text"
-              placeholder="Buscar por número, modelo o color..."
-              className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 w-80"
-              value={filtro}
-              onChange={(e) => setFiltro(e.target.value)}
-            />
+              <div className="flex gap-4 items-center">
+                <button
+                  onClick={recargarPedidos}
+                  disabled={isLoading}
+                  className={`p-2 rounded-full ${
+                    isLoading ? 'bg-gray-300' : 'bg-blue-500 hover:bg-blue-600'
+                  } text-white`}
+                >
+                  {isLoading ? (
+                    <span className="inline-block animate-spin">↻</span>
+                  ) : (
+                    <span>↻</span>
+                  )}
+                </button>
+                <input
+                  type="text"
+                  placeholder="Buscar por número, modelo o color..."
+                  className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 w-80"
+                  value={filtro}
+                  onChange={(e) => setFiltro(e.target.value)}
+                />
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
 
       {/* Lista de Pedidos */}
       <div className="bg-white shadow rounded-lg p-6">
@@ -188,7 +207,7 @@ const Oficina = () => {
                       {pedido.color}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {pedido.usuario_nombre}
+                      {pedido.usuario_nombre || 'No asignado'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {new Date(pedido.created_at).toLocaleString()}
